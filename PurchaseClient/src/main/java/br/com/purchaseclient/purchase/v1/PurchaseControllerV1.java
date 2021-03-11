@@ -5,6 +5,7 @@ import java.util.List;
 
 import javax.validation.Valid;
 
+import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,11 +19,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import br.com.livraria.apilivraria.book.services.GetBookService;
-import br.com.livraria.apilivraria.client.services.GetClientService;
+import br.com.purchaseclient.purchase.BookDTO;
 import br.com.purchaseclient.purchase.Purchase;
 import br.com.purchaseclient.purchase.PurchaseDTO;
 import br.com.purchaseclient.purchase.service.DeletePurchaseService;
+import br.com.purchaseclient.purchase.service.GetBookService;
+import br.com.purchaseclient.purchase.service.GetClientService;
 import br.com.purchaseclient.purchase.service.GetPurchaseService;
 import br.com.purchaseclient.purchase.service.ListPagePurchaseService;
 import br.com.purchaseclient.purchase.service.ListPurchaseService;
@@ -33,6 +35,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(value = "/v1/api/purchase")
+@EnableFeignClients(basePackages = "br.com.purchaseclient.purchase.service")
 public class PurchaseControllerV1 {
 
 	private final GetPurchaseService getPurchaseService;
@@ -46,40 +49,50 @@ public class PurchaseControllerV1 {
 
 	@GetMapping(value = "/{id}")
 	public PurchaseDTO find(@PathVariable("id") Long id) {
-		return PurchaseDTO.from(getPurchaseService.find(id));
+		PurchaseDTO compra = PurchaseDTO.from(getPurchaseService.find(id));
+		buscarClienteELivros(compra);
+		return compra;
 	}
 
 	@GetMapping
 	public List<PurchaseDTO> findAll() {
-		return PurchaseDTO.fromAll(listPurchaseService.findAll());
+		List<PurchaseDTO> lista = PurchaseDTO.fromAll(listPurchaseService.findAll());
+		for (PurchaseDTO compra : lista) 
+			buscarClienteELivros(compra);
+		return lista;
+	}
+
+	private void buscarClienteELivros(PurchaseDTO compra) {
+		compra.setClient(getClientService.find(compra.getClient().getId()));
+		List<BookDTO> listalivros = new ArrayList<BookDTO>();
+		for (BookDTO book : compra.getBooks())
+			listalivros.add(getBookService.find(book.getId()));
+		compra.setBooks(listalivros);
 	}
 
 	@GetMapping("/search")
 	public Page<PurchaseDTO> search(@RequestParam(value = "cliente_id", required = false) Integer searchTerm,
 			@RequestParam(value = "page", required = false, defaultValue = "0") int page,
 			@RequestParam(value = "size", required = false, defaultValue = "10") int size) {
-		return  PurchaseDTO.fromPage(listPagePurchaseService.findPage(searchTerm, page, size));
+		Page<PurchaseDTO> paginas = PurchaseDTO.fromPage(listPagePurchaseService.findPage(searchTerm, page, size));
+		
+		for(PurchaseDTO compra : paginas.getContent()) 
+			buscarClienteELivros(compra);
+		
+		return  paginas ;
 	}
 
 	@ResponseStatus(code = HttpStatus.CREATED)
 	@PostMapping // adiciona um novo Purchase
 	public void insert(@Valid @RequestBody PurchaseDTO purchaseDTO) {
-		purchaseDTO.setClient(getClientService.find(purchaseDTO.getClient().getId()));
-		List<Book> livros = new ArrayList<Book>();
-		for (Book book : purchaseDTO.getBooks()) 
-			livros .add(getBookService.find(book.getId()));
-		purchaseDTO.setBooks(livros);
+		buscarClienteELivros(purchaseDTO);
 		savePurchaseService.insert(Purchase.to(purchaseDTO));
 	}
 
 	@ResponseStatus(code = HttpStatus.NO_CONTENT)
 	@PutMapping(value = "/{id}") // atualizar um Purchase
 	public void update(@Valid @RequestBody PurchaseDTO purchaseDTO, @PathVariable Long id) {
-		purchaseDTO.setClient(getClientService.find(purchaseDTO.getClient().getId()));
-		List<Book> livros = new ArrayList<Book>();
-		for (Book iterable_element : purchaseDTO.getBooks()) 
-			livros .add(getBookService.find(iterable_element.getId()));
-		purchaseDTO.setBooks(livros);
+		buscarClienteELivros(purchaseDTO);
 		updatePurchaseService.update(Purchase.to(purchaseDTO), id);
 	}
 

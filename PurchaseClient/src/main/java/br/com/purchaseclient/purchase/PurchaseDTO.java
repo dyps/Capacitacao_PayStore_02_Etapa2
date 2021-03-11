@@ -1,6 +1,7 @@
 package br.com.purchaseclient.purchase;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,8 +21,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Getter
-@Setter
+@Getter@Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder(builderClassName = "Builder")
@@ -30,12 +30,11 @@ public class PurchaseDTO {
 	private Long id;
 
 	@NotNull
-	@Valid
-	private Client client;
+	private ClientDTO client;
 
 	@NotEmpty
 	@Valid
-	private List books;
+	private List<BookDTO> books;
 
 	@NotNull
 	@Positive
@@ -50,11 +49,16 @@ public class PurchaseDTO {
 	private Boolean completed;
 
 	public static PurchaseDTO from(Purchase purchase) {
-
+		List<BookDTO> lista = new ArrayList<BookDTO>();
+		for (Long bookDTO : purchase.getBooks()) 
+			lista.add(BookDTO.builder().id( bookDTO ).build());
+		
 		return PurchaseDTO.builder()
 				.id(purchase.getId())
-				.client(purchase.getClient())
-				.books(purchase.getBooks())
+				.client(ClientDTO.builder()
+						.id(purchase.getClient())
+						.build())
+				.books(lista)
 				.amount(purchase.getAmount())
 				.datePurchase(purchase.getDatePurchase())
 				.completed(purchase.getCompleted())
